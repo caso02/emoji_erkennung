@@ -3,3 +3,4 @@
 /Users/lucashersche/zhaw/MDM/MDM/projekt2_neu/emoji/src/main/java/ch/zhaw/emoji/emoji/emojiApplication.java
 /Users/lucashersche/zhaw/MDM/MDM/projekt2_neu/emoji/src/main/java/ch/zhaw/emoji/emoji/service/EmojiRecognizer.java
 /Users/lucashersche/zhaw/MDM/MDM/projekt2_neu/emoji/src/main/java/ch/zhaw/emoji/emoji/training/EmojiTraining.java
+/Users/lucashersche/zhaw/MDM/MDM/projekt2_neu/emoji/src/main/java/ch/zhaw/emoji/emoji/util/EmojiSetupUtil.java
