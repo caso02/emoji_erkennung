@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emoji-Erkennung</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        h1 {
+            color: #ff6b6b;
+            text-align: center;
+        }
+        .upload-area {
+            border: 2px dashed #ff6b6b;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+            border-radius: 10px;
+            background-color: #fff;
+            transition: all 0.3s ease;
+        }
+        .upload-area:hover {
+            border-color: #ff4757;
+            background-color: #fff5f5;
+        }
+        .preview {
+            max-width: 200px;
+            margin: 20px auto;
+            display: block;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        #result {
+            padding: 20px;
+            background: #fff;
+            border-radius: 10px;
+            margin-top: 20px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        button {
+            background-color: #ff6b6b;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            display: block;
+            margin: 0 auto;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #ff4757;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .emoji-icon {
+            font-size: 30px;
+            margin: 0 5px;
+        }
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .result-item:last-child {
+            border-bottom: none;
+        }
+        .progress-bar {
+            background-color: #f0f0f0;
+            border-radius: 13px;
+            height: 20px;
+            width: 60%;
+            position: relative;
+        }
+        .progress {
+            background-color: #ff6b6b;
+            height: 100%;
+            border-radius: 13px;
+            transition: width 0.5s ease;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎭 Emoji-Erkennung 🎭</h1>
+    
+    <div class="upload-area">
+        <input type="file" id="imageInput" accept="image/*">
+        <p>Emoji-Bild hochladen oder hier ablegen</p>
+        <div>
+            <span class="emoji-icon">😀</span>
+            <span class="emoji-icon">😍</span>
+            <span class="emoji-icon">🤔</span>
+            <span class="emoji-icon">😎</span>
+            <span class="emoji-icon">👍</span>
+        </div>
+    </div>
+    
+    <img id="preview" class="preview" style="display: none;">
+    
+    <button onclick="analyzeEmoji()" id="analyzeBtn" disabled>Emoji erkennen</button>
+    
+    <div id="result"></div>
+
+    <script>
+        const imageInput = document.getElementById('imageInput');
+        const preview = document.getElementById('preview');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const resultDiv = document.getElementById('result');
+
+        imageInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    preview.src = e.target.result;
+                    preview.style.display = 'block';
+                    analyzeBtn.disabled = false;
+                }
+                reader.readAsDataURL(file);
+            }
+        });
+
+        async function analyzeEmoji() {
+            const file = imageInput.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('image', file);
+
+            try {
+                analyzeBtn.disabled = true;
+                resultDiv.innerHTML = '<p>Erkenne Emoji...</p>';
+
+                const response = await fetch('/api/emoji/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                
+                if (data.error) {
+                    resultDiv.innerHTML = `<p style="color: red;">Fehler: ${data.error}</p>`;
+                } else {
+                    // Format results
+                    let output = '<h3>Erkennungsergebnisse:</h3>';
+                    
+                    output += '<div>';
+                    for (let i = 0; i < Math.min(data.classNames.length, 5); i++) {
+                        const percentage = (data.probabilities[i] * 100).toFixed(1);
+                        output += `
+                            <div class="result-item">
+                                <span>${data.classNames[i]}</span>
+                                <div class="progress-bar">
+                                    <div class="progress" style="width: ${percentage}%"></div>
+                                </div>
+                                <span>${percentage}%</span>
+                            </div>
+                        `;
+                    }
+                    output += '</div>';
+                    
+                    resultDiv.innerHTML = output;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<p style="color: red;">Fehler: ${error.message}</p>`;
+            } finally {
+                analyzeBtn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
