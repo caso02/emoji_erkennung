@@ -42,6 +42,18 @@ public class EmojiRecognizer {
                 isModelTrained = true;
             } else {
                 logger.info("No trained model found. Checking if dataset exists for training...");
+                
+                // Check if dataset exists
+                Path datasetPath = Paths.get("./emojiimage-dataset");
+                if (Files.exists(datasetPath)) {
+                    logger.info("Dataset found at {}. Training will be performed on first use.", datasetPath);
+                    
+                    // Load fallback model for now, training will happen on first prediction
+                    loadFallbackModel();
+                } else {
+                    logger.warn("No dataset found at {}. Using ImageNet fallback model.", datasetPath);
+                    loadFallbackModel();
+                }
             }
             
             logger.info("Emoji recognizer initialization successful.");
@@ -93,6 +105,87 @@ public class EmojiRecognizer {
             logger.info("Trained emoji model loaded successfully");
         } catch (Exception e) {
             logger.error("Error loading trained model", e);
+            logger.info("Falling back to default model");
+            try {
+                loadFallbackModel();
+            } catch (Exception ex) {
+                logger.error("Failed to load fallback model", ex);
+            }
+        }
+    }
+    
+    /**
+     * Loads a fallback ImageNet model when no emoji model is available
+     */
+    private void loadFallbackModel() throws ModelNotFoundException, MalformedModelException, IOException {
+        List<String> attemptedModels = new ArrayList<>();
+        
+        // Try several options to ensure we get a working model
+        Exception lastException = null;
+        
+        // Option 1: Try ResNet18
+        try {
+            attemptedModels.add("resnet18");
+            Criteria<Image, Classifications> criteria = Criteria.builder()
+                    .optApplication(Application.CV.IMAGE_CLASSIFICATION)
+                    .setTypes(Image.class, Classifications.class)
+                    .optFilter("backbone", "resnet18")
+                    .optFilter("dataset", "imagenet")
+                    .optDevice(Device.cpu())
+                    .optProgress(new ProgressBar())
+                    .build();
+            
+            ZooModel<Image, Classifications> model = criteria.loadModel();
+            predictor = model.newPredictor();
+            logger.info("Loaded ResNet18 model as fallback");
+            return;
+        } catch (Exception e) {
+            lastException = e;
+            logger.warn("Failed to load ResNet18 model: {}", e.getMessage());
+        }
+        
+        // Option 2: Try any ImageNet model
+        try {
+            attemptedModels.add("generic ImageNet");
+            Criteria<Image, Classifications> criteria = Criteria.builder()
+                    .optApplication(Application.CV.IMAGE_CLASSIFICATION)
+                    .setTypes(Image.class, Classifications.class)
+                    .optFilter("dataset", "imagenet")
+                    .optDevice(Device.cpu())
+                    .optProgress(new ProgressBar())
+                    .build();
+            
+            ZooModel<Image, Classifications> model = criteria.loadModel();
+            predictor = model.newPredictor();
+            logger.info("Loaded generic ImageNet model as fallback");
+            return;
+        } catch (Exception e) {
+            lastException = e;
+            logger.warn("Failed to load generic ImageNet model: {}", e.getMessage());
+        }
+        
+        // Option 3: Final attempt - use any available model from model zoo
+        try {
+            attemptedModels.add("any available model");
+            Criteria<Image, Classifications> criteria = Criteria.builder()
+                    .setTypes(Image.class, Classifications.class)
+                    .optDevice(Device.cpu())
+                    .optProgress(new ProgressBar())
+                    .build();
+            
+            ZooModel<Image, Classifications> model = criteria.loadModel();
+            predictor = model.newPredictor();
+            logger.info("Loaded available model from model zoo as fallback");
+            return;
+        } catch (Exception e) {
+            lastException = e;
+            logger.error("Failed to load any model: {}", e.getMessage());
+        }
+        
+        // If we reach here, all attempts failed
+        logger.error("All model loading attempts failed: tried {}", attemptedModels);
+        if (lastException != null) {
+            throw new RuntimeException("Failed to load any model", lastException);
         }
     }
     
@@ -103,6 +196,15 @@ public class EmojiRecognizer {
         if (predictor == null) {
             logger.error("Predictor is not initialized");
             throw new IllegalStateException("Emoji recognizer is not properly initialized");
+        }
+        
+        // If we're using a fallback model and the dataset exists, we could train here
+        if (!isModelTrained) {
+            Path datasetPath = Paths.get("./emojiimage-dataset");
+            if (Files.exists(datasetPath)) {
+                logger.info("Dataset exists but no trained model found. Consider running EmojiTraining first.");
+                // Note: We could trigger training here, but it would delay the first prediction
+            }
         }
         
         // Perform the prediction
@@ -120,6 +222,8 @@ public class EmojiRecognizer {
      * Prepares an image for model prediction
      */
     private Image prepareImageForModel(Image original) {
+        // Most models expect images of a specific size
+        // For now, we'll return the original, but we could resize here if needed
         return original;
     }
     

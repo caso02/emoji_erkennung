@@ -4,13 +4,17 @@ import ch.zhaw.emoji.emoji.training.EmojiTraining;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Profile;
 
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 
 /**
  * Utility class to help with initial setup and model training
@@ -68,10 +72,22 @@ public class EmojiSetupUtil implements ApplicationRunner {
         // Check if force training is requested
         if (args.containsOption("train")) {
             return true;
-        }else{
-            return false;
         }
         
+        // Check if model files exist
+        Path modelPath = Paths.get("./trained-models/emoji-model");
+        if (!Files.exists(modelPath)) {
+            // No model exists, check if dataset exists
+            if (emojiTraining.verifyDataset("./emojiimage-dataset")) {
+                logger.info("No model found but dataset exists. Training recommended.");
+                return true;
+            } else {
+                logger.warn("No model and no valid dataset found. Cannot train.");
+                return false;
+            }
+        }
+        
+        return false;
     }
     
     /**

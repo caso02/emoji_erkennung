@@ -88,6 +88,27 @@
             border-radius: 13px;
             transition: width 0.5s ease;
         }
+        .loading {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #ff6b6b;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .error {
+            color: #ff0000;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -130,6 +151,40 @@
             }
         });
 
+        // Allow drag and drop
+        const uploadArea = document.querySelector('.upload-area');
+        
+        uploadArea.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#ff4757';
+            uploadArea.style.backgroundColor = '#fff5f5';
+        });
+        
+        uploadArea.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#ff6b6b';
+            uploadArea.style.backgroundColor = '#fff';
+        });
+        
+        uploadArea.addEventListener('drop', function(e) {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#ff6b6b';
+            uploadArea.style.backgroundColor = '#fff';
+            
+            if (e.dataTransfer.files.length) {
+                imageInput.files = e.dataTransfer.files;
+                const file = e.dataTransfer.files[0];
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    preview.src = e.target.result;
+                    preview.style.display = 'block';
+                    analyzeBtn.disabled = false;
+                }
+                reader.readAsDataURL(file);
+            }
+        });
+
         async function analyzeEmoji() {
             const file = imageInput.files[0];
             if (!file) return;
@@ -138,41 +193,78 @@
             formData.append('image', file);
 
             try {
+                // Disable button and show loading
                 analyzeBtn.disabled = true;
-                resultDiv.innerHTML = '<p>Erkenne Emoji...</p>';
+                resultDiv.innerHTML = `
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <p>Erkenne Emoji...</p>
+                    </div>
+                `;
 
                 const response = await fetch('/api/emoji/analyze', {
                     method: 'POST',
                     body: formData
                 });
 
-                const data = await response.json();
+                // Parse the response
+                const text = await response.text();
+                let data;
                 
-                if (data.error) {
-                    resultDiv.innerHTML = `<p style="color: red;">Fehler: ${data.error}</p>`;
-                } else {
-                    // Format results
-                    let output = '<h3>Erkennungsergebnisse:</h3>';
-                    
-                    output += '<div>';
-                    for (let i = 0; i < Math.min(data.classNames.length, 5); i++) {
-                        const percentage = (data.probabilities[i] * 100).toFixed(1);
-                        output += `
-                            <div class="result-item">
-                                <span>${data.classNames[i]}</span>
-                                <div class="progress-bar">
-                                    <div class="progress" style="width: ${percentage}%"></div>
-                                </div>
-                                <span>${percentage}%</span>
-                            </div>
-                        `;
-                    }
-                    output += '</div>';
-                    
-                    resultDiv.innerHTML = output;
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
+                    // Handle non-JSON response
+                    resultDiv.innerHTML = `<p class="error">Ungültige Antwort vom Server: ${text}</p>`;
+                    analyzeBtn.disabled = false;
+                    return;
                 }
+                
+                // Handle error response
+                if (data.error) {
+                    resultDiv.innerHTML = `<p class="error">Fehler: ${data.error}</p>`;
+                    analyzeBtn.disabled = false;
+                    return;
+                }
+                
+                // Check if we have the expected data structure
+                if (!data.classNames || !data.probabilities || data.classNames.length === 0) {
+                    resultDiv.innerHTML = `
+                        <p class="error">Unerwartetes Antwortformat. Server antwortete mit:</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                    analyzeBtn.disabled = false;
+                    return;
+                }
+                
+                // Format results
+                let output = '<h3>Erkennungsergebnisse:</h3>';
+                
+                output += '<div>';
+                for (let i = 0; i < Math.min(data.classNames.length, 5); i++) {
+                    // Clean up class name if it has ImageNet format (n00000000 name)
+                    let className = data.classNames[i];
+                    if (className.includes(' ')) {
+                        // Extract just the name part for ImageNet classes (e.g., "n03720891 maraca" -> "maraca")
+                        className = className.split(' ').slice(1).join(' ');
+                    }
+                    
+                    const percentage = (data.probabilities[i] * 100).toFixed(1);
+                    output += `
+                        <div class="result-item">
+                            <span>${className}</span>
+                            <div class="progress-bar">
+                                <div class="progress" style="width: ${percentage}%"></div>
+                            </div>
+                            <span>${percentage}%</span>
+                        </div>
+                    `;
+                }
+                output += '</div>';
+                
+                resultDiv.innerHTML = output;
             } catch (error) {
-                resultDiv.innerHTML = `<p style="color: red;">Fehler: ${error.message}</p>`;
+                resultDiv.innerHTML = `<p class="error">Fehler: ${error.message}</p>`;
             } finally {
                 analyzeBtn.disabled = false;
             }

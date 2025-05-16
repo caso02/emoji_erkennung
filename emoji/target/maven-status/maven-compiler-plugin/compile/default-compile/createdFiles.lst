@@ -1,0 +1,6 @@
+ch/zhaw/emoji/emoji/PingController.class
+ch/zhaw/emoji/emoji/util/EmojiSetupUtil.class
+ch/zhaw/emoji/emoji/emojiApplication.class
+ch/zhaw/emoji/emoji/training/EmojiTraining.class
+ch/zhaw/emoji/emoji/controller/EmojiController.class
+ch/zhaw/emoji/emoji/service/EmojiRecognizer.class
